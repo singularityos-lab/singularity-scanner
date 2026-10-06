@@ -1,0 +1,15 @@
+[Desktop Entry]
+Name=Document Scanner
+Comment=Scan documents and photos to PDF or images
+Exec=singularity-scanner
+Icon=dev.sinty.scanner
+Terminal=false
+Type=Application
+Categories=Graphics;Scanning;
+Keywords=scan;scanner;document;pdf;sane;paper;
+StartupWMClass=dev.sinty.scanner
+Actions=quick-scan;
+
+[Desktop Action quick-scan]
+Name=Quick Scan
+Exec=singularity-scanner --quick-scan
