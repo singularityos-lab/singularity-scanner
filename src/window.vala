@@ -503,6 +503,10 @@ namespace Singularity.Apps.Scanner {
             if (index > 0) menu.add_item (_("Move Earlier"), "go-previous-symbolic", () => move (card, -1));
             if (index < pages.size - 1) menu.add_item (_("Move Later"), "go-next-symbolic", () => move (card, 1));
             menu.add_item (_("Save This Page"), "document-save-symbolic", () => save_pages (single (card.page)));
+            if (Singularity.TextRecognition.Recognizer.get_default ().available) {
+                menu.add_item (_("Copy Text"), "edit-copy-symbolic", () => page_text.begin (card.page, false));
+                menu.add_item (_("Send Text to Write"), "x-office-document-symbolic", () => page_text.begin (card.page, true));
+            }
             menu.add_separator ();
             menu.add_item (_("Delete"), "user-trash-symbolic", () => remove_page (card), "destructive");
             menu.pointing_to = { (int) x, (int) y, 1, 1 };
@@ -613,12 +617,54 @@ namespace Singularity.Apps.Scanner {
                     if (fmt == ExportFormat.PDF && !path.down ().has_suffix (".pdf")) path += ".pdf";
                     Export.save (list, path);
                     if (list.size == pages.size) dirty = false;
-                    show_toast (_("Saved %s").printf (Path.get_basename (path)));
+                    if (fmt == ExportFormat.PDF && Singularity.TextRecognition.Recognizer.get_default ().available) {
+                        show_toast (_("Recognizing text in %s").printf (Path.get_basename (path)));
+                        make_searchable.begin (list, path);
+                    } else {
+                        show_toast (_("Saved %s").printf (Path.get_basename (path)));
+                    }
                 } catch (Error e) {
                     if (e is Gtk.DialogError.DISMISSED) return;
                     show_error (_("Could Not Save"), e.message);
                 }
             });
+        }
+
+        private async void page_text (ScanPage page, bool to_write) {
+            try {
+                var result = yield Singularity.TextRecognition.Recognizer.get_default ().recognize_texture (Gdk.Texture.for_pixbuf (page.pixbuf ()), null);
+                string text = result.text.strip ();
+                if (text == "") {
+                    show_toast (_("No text found on this page"));
+                    return;
+                }
+                if (!to_write) {
+                    get_clipboard ().set_text (text);
+                    show_toast (_("Text copied"));
+                    return;
+                }
+                string dir = Path.build_filename (Environment.get_user_cache_dir (), "singularity", "scanner-text");
+                DirUtils.create_with_parents (dir, 0700);
+                string path = Path.build_filename (dir, _("Scanned Text %s.txt").printf (new DateTime.now_local ().format ("%Y-%m-%d %H-%M-%S")));
+                FileUtils.set_contents (path, text + "\n");
+                var write = new DesktopAppInfo ("dev.sinty.write.desktop");
+                var files = new GLib.List<File> ();
+                files.append (File.new_for_path (path));
+                if (write != null) write.launch (files, Gdk.Display.get_default ().get_app_launch_context ());
+                else new FileLauncher (File.new_for_path (path)).launch.begin (this, null);
+            } catch (Error e) {
+                show_error (_("Could Not Recognize Text"), e.message);
+            }
+        }
+
+        private async void make_searchable (Gee.List<ScanPage> list, string path) {
+            try {
+                int found = yield Export.add_text_layer (list, path);
+                show_toast (found > 0 ? _("Saved %s, the text is searchable").printf (Path.get_basename (path)) : _("Saved %s").printf (Path.get_basename (path)));
+            } catch (Error e) {
+                show_toast (_("Saved %s without searchable text").printf (Path.get_basename (path)));
+                warning ("Scanner: text layer failed: %s", e.message);
+            }
         }
 
         private static string mode_label (string mode) {

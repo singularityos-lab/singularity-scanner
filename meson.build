@@ -16,6 +16,7 @@ sane_dep = dependency('sane-backends')
 libsingularity_dep = dependency('singularity-1.0',
   fallback: ['libsingularity', 'libsingularity_dep']
 )
+pdf_engine_dep = subproject('libsingularity').get_variable('libsingularity_pdf_dep')
 
 if not meson.is_subproject() and libsingularity_dep.type_name() == 'internal'
   libsingularity_vapi_dir = join_paths(meson.project_build_root(), 'subprojects', 'libsingularity')
@@ -30,7 +31,7 @@ executable('singularity-scanner',
   vala_args: ['--vapidir=' + meson.current_source_dir() / 'vapi', '--pkg=sanebridge', '--pkg=pdfhelper'],
   include_directories: include_directories('src'),
   link_with: bridge,
-  dependencies: [gtk_dep, gee_dep, cairo_dep, libsingularity_dep],
+  dependencies: [gtk_dep, gee_dep, cairo_dep, libsingularity_dep, pdf_engine_dep],
   install: true
 )
 
@@ -48,5 +49,5 @@ test_export = executable('export-test', files('src/scan.vala', 'src/export.vala'
   vala_args: ['--vapidir=' + meson.current_source_dir() / 'vapi', '--pkg=sanebridge', '--pkg=pdfhelper'],
   include_directories: include_directories('src'),
   link_with: bridge,
-  dependencies: [gtk_dep, gee_dep, cairo_dep])
+  dependencies: [gtk_dep, gee_dep, cairo_dep, libsingularity_dep, pdf_engine_dep])
 test('export', test_export)

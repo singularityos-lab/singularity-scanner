@@ -14,6 +14,28 @@ namespace Singularity.Apps.Scanner {
     }
 
     namespace Export {
+        public async int add_text_layer (Gee.List<ScanPage> list, string path) throws Error {
+            var recognizer = Singularity.TextRecognition.Recognizer.get_default ();
+            var doc = Singularity.Pdf.Document.open_file (path);
+            int found = 0;
+            for (int i = 0; i < list.size && i < doc.page_count (); i++) {
+                var pix = list[i].pixbuf ();
+                var result = yield recognizer.recognize_texture (Gdk.Texture.for_pixbuf (pix), null);
+                double[] box = doc.page_box (i);
+                double pw = box[2] - box[0], ph = box[3] - box[1];
+                double sx = pw / pix.width, sy = ph / pix.height;
+                var words = new Gee.ArrayList<Singularity.Pdf.OcrWord> ();
+                foreach (var w in result.words) {
+                    if (w.text.strip () == "") continue;
+                    words.add (new Singularity.Pdf.OcrWord (w.text, Singularity.Pdf.Rect.of (box[0] + w.x * sx, box[1] + ph - (w.y + w.height) * sy,
+                        box[0] + (w.x + w.width) * sx, box[1] + ph - w.y * sy)));
+                }
+                found += Singularity.Pdf.Scans.add_text_layer (doc, i, words);
+            }
+            if (found > 0) doc.save_to_file (path);
+            return found;
+        }
+
         public string numbered (string path, int index, int total) {
             if (total <= 1) return path;
             int dot = path.last_index_of (".");

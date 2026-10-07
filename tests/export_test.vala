@@ -45,5 +45,32 @@ void main (string[] args) {
         FileUtils.remove (path);
         DirUtils.remove (dir);
     });
+    Test.add_func ("/export/searchable", () => {
+        if (!Singularity.TextRecognition.Recognizer.get_default ().available) {
+            Test.skip ("no text recognition engine");
+            return;
+        }
+        string dir = DirUtils.make_tmp ("scan-XXXXXX");
+        string path = Path.build_filename (dir, "text.pdf");
+        var pages = new Gee.ArrayList<ScanPage> ();
+        pages.add (make_page (850, 1100, 100, 230));
+        Export.save (pages, path);
+        var loop = new MainLoop ();
+        int found = -1;
+        Export.add_text_layer.begin (pages, path, (o, r) => {
+            try {
+                found = Export.add_text_layer.end (r);
+            } catch (Error e) {
+                error (e.message);
+            }
+            loop.quit ();
+        });
+        loop.run ();
+        assert (found == 2);
+        var doc = Singularity.Pdf.Document.open_file (path);
+        assert (Singularity.Pdf.Scans.has_text_layer (doc, 0));
+        FileUtils.remove (path);
+        DirUtils.remove (dir);
+    });
     Test.run ();
 }
