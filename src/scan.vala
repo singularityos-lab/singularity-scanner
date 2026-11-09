@@ -183,30 +183,31 @@ namespace Singularity.Apps.Scanner {
         }
 
         public async void refresh () {
-            SourceFunc cb = refresh.callback;
             var found = new Gee.ArrayList<DeviceInfo> ();
-            new Thread<void*> ("sane-list", () => {
-                lock.lock ();
-                ensure_init ();
-                if (handle != null) {
-                    handle = null;
-                    handle_name = "";
-                }
-                foreach (string row in SaneBridge.devices ()) {
-                    string[] parts = row.split ("\t");
-                    if (parts.length < 4 || parts[0] == "") continue;
-                    var d = new DeviceInfo ();
-                    d.name = parts[0];
-                    d.vendor = parts[1];
-                    d.model = parts[2];
-                    d.kind = parts[3];
-                    found.add (d);
-                }
-                lock.unlock ();
-                Idle.add ((owned) cb);
-                return null;
-            });
-            yield;
+            try {
+                yield Async.run<bool>((c) => {
+                    lock.lock ();
+                    ensure_init ();
+                    if (handle != null) {
+                        handle = null;
+                        handle_name = "";
+                    }
+                    foreach (string row in SaneBridge.devices ()) {
+                        string[] parts = row.split ("\t");
+                        if (parts.length < 4 || parts[0] == "") continue;
+                        var d = new DeviceInfo ();
+                        d.name = parts[0];
+                        d.vendor = parts[1];
+                        d.model = parts[2];
+                        d.kind = parts[3];
+                        found.add (d);
+                    }
+                    lock.unlock ();
+                    return true;
+                }, Async.Qos.USER);
+            } catch (Error e) {
+                warning("%s", e.message);
+            }
             devices.clear ();
             devices.add_all (found);
         }
@@ -221,26 +222,27 @@ namespace Singularity.Apps.Scanner {
         }
 
         public async DeviceOptions? options (string name, out string? error) {
-            SourceFunc cb = options.callback;
             DeviceOptions? result = null;
             string? err = null;
-            new Thread<void*> ("sane-options", () => {
-                lock.lock ();
-                ensure_init ();
-                unowned SaneBridge.Device? h = device_for (name, out err);
-                if (h != null) {
-                    result = new DeviceOptions ();
-                    result.sources = h.choices ("source");
-                    result.modes = h.choices ("mode");
-                    result.resolutions = h.resolutions ();
-                    result.max_width = h.max_number ("br-x");
-                    result.max_height = h.max_number ("br-y");
-                }
-                lock.unlock ();
-                Idle.add ((owned) cb);
-                return null;
-            });
-            yield;
+            try {
+                yield Async.run<bool>((c) => {
+                    lock.lock ();
+                    ensure_init ();
+                    unowned SaneBridge.Device? h = device_for (name, out err);
+                    if (h != null) {
+                        result = new DeviceOptions ();
+                        result.sources = h.choices ("source");
+                        result.modes = h.choices ("mode");
+                        result.resolutions = h.resolutions ();
+                        result.max_width = h.max_number ("br-x");
+                        result.max_height = h.max_number ("br-y");
+                    }
+                    lock.unlock ();
+                    return true;
+                }, Async.Qos.USER);
+            } catch (Error e) {
+                warning("%s", e.message);
+            }
             error = err;
             return result;
         }
@@ -260,7 +262,7 @@ namespace Singularity.Apps.Scanner {
             string mode = settings.mode;
             int resolution = settings.resolution;
             string paper = settings.paper;
-            new Thread<void*> ("sane-scan", () => {
+            Async.dispatch(this, Async.Qos.UTILITY, (c) => {
                 string? error = null;
                 lock.lock ();
                 ensure_init ();
@@ -277,12 +279,10 @@ namespace Singularity.Apps.Scanner {
                     }
                 }
                 lock.unlock ();
-                Idle.add (() => {
+                return () => {
                     busy = false;
                     scan_finished (error);
-                    return Source.REMOVE;
-                });
-                return null;
+                };
             });
         }
 
