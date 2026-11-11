@@ -27,7 +27,7 @@ bridge = static_library('scanner-bridge', 'src/sane-bridge.c', 'src/pdf-helper.c
   dependencies: [dependency('glib-2.0'), sane_dep, cairo_dep])
 
 executable('singularity-scanner',
-  files('src/scan.vala', 'src/export.vala', 'src/window.vala', 'src/app.vala'),
+  files('src/scan.vala', 'src/export.vala', 'src/window.vala', 'src/app.vala', 'src/agent_intents.vala'),
   vala_args: ['--vapidir=' + meson.current_source_dir() / 'vapi', '--pkg=sanebridge', '--pkg=pdfhelper'],
   include_directories: include_directories('src'),
   link_with: bridge,

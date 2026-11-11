@@ -75,6 +75,7 @@ namespace Singularity.Apps.Scanner {
             scanner.append_section (null, s2);
             menu.append_submenu (_("Scanner"), scanner);
             set_menubar (menu);
+            ScannerIntents.install (this);
             var quit = new SimpleAction ("quit", null);
             quit.activate.connect (() => {
                 foreach (var w in get_windows ().copy ()) w.close ();

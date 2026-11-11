@@ -667,6 +667,70 @@ namespace Singularity.Apps.Scanner {
             }
         }
 
+        internal ScannerService agent_service () {
+            return service;
+        }
+
+        internal ScanSettings agent_settings () {
+            return settings;
+        }
+
+        internal DeviceOptions? agent_options () {
+            return options;
+        }
+
+        internal Gee.List<ScanPage> agent_pages () {
+            return pages;
+        }
+
+        internal bool agent_searching () {
+            return searching;
+        }
+
+        internal async void agent_search () {
+            yield search ();
+        }
+
+        internal async void agent_apply () {
+            settings.save ();
+            yield load_options ();
+            sync ();
+        }
+
+        internal bool agent_scan (bool all_pages) {
+            if (service.busy || settings.device == "" || options == null) return false;
+            start_scan (all_pages);
+            return service.busy;
+        }
+
+        private PageCard? agent_card (int index) {
+            return grid.get_child_at_index (index) as PageCard;
+        }
+
+        internal void agent_rotate (int index, int by) {
+            var card = agent_card (index);
+            if (card != null) rotate (card, (by % 360 + 360) % 360);
+        }
+
+        internal void agent_move (int index, int delta) {
+            var card = agent_card (index);
+            if (card != null) move (card, delta);
+        }
+
+        internal void agent_remove (int index) {
+            var card = agent_card (index);
+            if (card != null) remove_page (card);
+        }
+
+        internal void agent_clear () {
+            clear_pages ();
+        }
+
+        internal void agent_saved (Gee.List<ScanPage> list, string path) {
+            if (list.size == pages.size) dirty = false;
+            show_toast (_("Saved %s").printf (Path.get_basename (path)));
+        }
+
         private static string mode_label (string mode) {
             switch (mode.down ()) {
                 case "color": return _("Color");
